@@ -283,7 +283,7 @@ def main():
     parser.add_argument('-o', '--output', default='.', help='Output directory')
     parser.add_argument('--no-metadata', action='store_true', help='Skip metadata')
     parser.add_argument('--transcribe', action='store_true', help='Transcribe video to text')
-    parser.add_argument('--model', default='base', choices=['tiny', 'base', 'small', 'medium', 'large'],
+    parser.add_argument('--model', default='medium', choices=['medium', 'large'],
                         help='Whisper model size (default: base)')
 
     args = parser.parse_args()

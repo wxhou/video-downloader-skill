@@ -73,7 +73,7 @@ def main():
     parser = argparse.ArgumentParser(description='Transcribe video to text')
     parser.add_argument('video', help='Video file path')
     parser.add_argument('-o', '--output', help='Output file path (default: video.txt)')
-    parser.add_argument('-m', '--model', default='base',
+    parser.add_argument('-m', '--model', default='medium',
                         choices=['tiny', 'base', 'small', 'medium', 'large'],
                         help='Whisper model size (default: base)')
     parser.add_argument('-l', '--language', default='zh',

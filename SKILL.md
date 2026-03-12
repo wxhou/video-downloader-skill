@@ -126,7 +126,48 @@ Common errors and solutions:
 python scripts/download.py "https://www.douyin.com/video/123456789"
 ```
 
-如果 Playwright 方式失败，可以尝试 yt-dlp + cookies 方式：
+## 视频转录 (语音转文字)
+
+使用 OpenAI Whisper 进行语音转文字。
+
+### 安装转录依赖
+
+```bash
+pip install openai-whisper
+```
+
+### ⚠️ 重要：模型要求
+
+**必须使用 medium 或 larger 模型**，tiny/base/small 模型识别效果差。
+
+```bash
+# 下载 medium 模型 (约 1.4GB)
+# 首次运行时会自动下载
+
+# 转录视频
+python scripts/transcribe.py video.mp4 -m medium
+
+# 下载+转录
+python scripts/download.py "VIDEO_URL" --transcribe --model medium
+```
+
+### Whisper 模型对比
+
+| 模型 | 大小 | 准确率 | 推荐 |
+|------|------|--------|------|
+| tiny/base/small | ~40-240MB | 较低 | ❌ 不推荐 |
+| **medium** | 1.4GB | 较高 | ✅ 推荐 |
+| large | 2.9GB | 最高 | 可选 |
+
+### 使用示例
+
+```bash
+# 单独转录
+python scripts/transcribe.py ~/Downloads/video.mp4 -m medium
+
+# 下载抖音视频并转录
+python scripts/download.py "https://v.douyin.com/xxxxx" --transcribe --model medium
+```
 
 ## Implementation
 
