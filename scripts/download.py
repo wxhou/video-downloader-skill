@@ -2,6 +2,7 @@
 """
 Video Downloader - Download videos from multiple platforms
 Supports: Douyin, X/Twitter, Bilibili, YouTube, Xiaohongshu
+With audio transcription support
 """
 
 import argparse
@@ -19,6 +20,12 @@ try:
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
+
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
 
 
 def detect_platform(url: str) -> str:
@@ -143,6 +150,86 @@ def download_douyin(url: str, output_dir: str = '.') -> dict:
     return asyncio.run(download_douyin_async(url, output_dir))
 
 
+def extract_audio(video_path: str, output_dir: str = '.') -> str:
+    """Extract audio from video using ffmpeg"""
+    video_path = Path(video_path)
+    output_path = Path(output_dir)
+    audio_path = output_path / f"{video_path.stem}.m4a"
+
+    cmd = [
+        'ffmpeg', '-i', str(video_path),
+        '-vn', '-acodec', 'copy',
+        '-y', str(audio_path)
+    ]
+
+    try:
+        subprocess.run(cmd, capture_output=True, check=True)
+        return str(audio_path)
+    except subprocess.CalledProcessError:
+        # Try with re-encoding
+        cmd = [
+            'ffmpeg', '-i', str(video_path),
+            '-vn', '-acodec', 'aac',
+            '-y', str(audio_path)
+        ]
+        subprocess.run(cmd, capture_output=True, check=True)
+        return str(audio_path)
+
+
+def transcribe_audio(audio_path: str, model: str = 'base') -> dict:
+    """Transcribe audio using OpenAI Whisper"""
+
+    if not WHISPER_AVAILABLE:
+        return {
+            'success': False,
+            'error': 'whisper not installed. Run: pip install openai-whisper'
+        }
+
+    try:
+        print(f"Loading Whisper {model} model...")
+        whisper_model = whisper.load_model(model)
+
+        print("Transcribing audio...")
+        result = whisper_model.transcribe(audio_path, language='zh')
+
+        return {
+            'success': True,
+            'text': result['text'],
+            'language': result.get('language', 'zh')
+        }
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+def transcribe_video(video_path: str, output_dir: str = '.', model: str = 'base') -> dict:
+    """Extract audio and transcribe video"""
+    video_path = Path(video_path)
+
+    if not video_path.exists():
+        return {'success': False, 'error': 'Video file not found'}
+
+    print(f"Extracting audio from {video_path.name}...")
+    audio_path = extract_audio(str(video_path), output_dir)
+
+    if not audio_path:
+        return {'success': False, 'error': 'Failed to extract audio'}
+
+    print(f"Audio extracted to: {audio_path}")
+
+    # Transcribe
+    result = transcribe_audio(audio_path, model)
+
+    # Save transcript
+    if result.get('success'):
+        transcript_path = Path(output_dir) / f"{video_path.stem}.txt"
+        with open(transcript_path, 'w', encoding='utf-8') as f:
+            f.write(result['text'])
+        result['transcript_path'] = str(transcript_path)
+        print(f"Transcript saved to: {transcript_path}")
+
+    return result
+
+
 def download_video(url: str, output_dir: str = '.', extract_metadata: bool = True) -> dict:
     """Download video using appropriate method"""
 
@@ -195,6 +282,9 @@ def main():
     parser.add_argument('url', help='Video URL')
     parser.add_argument('-o', '--output', default='.', help='Output directory')
     parser.add_argument('--no-metadata', action='store_true', help='Skip metadata')
+    parser.add_argument('--transcribe', action='store_true', help='Transcribe video to text')
+    parser.add_argument('--model', default='base', choices=['tiny', 'base', 'small', 'medium', 'large'],
+                        help='Whisper model size (default: base)')
 
     args = parser.parse_args()
 
@@ -208,6 +298,21 @@ def main():
         print(f"\n✓ Success! Platform: {result['platform']}")
         if result.get('video_path'):
             print(f"Video: {result['video_path']}")
+
+        # Transcribe if requested
+        if args.transcribe and result.get('video_path'):
+            print("\n--- Transcribing ---")
+            transcribe_result = transcribe_video(
+                result['video_path'],
+                args.output,
+                args.model
+            )
+            if transcribe_result.get('success'):
+                print(f"\n✓ Transcript: {transcribe_result['text'][:200]}...")
+                print(f"Transcript saved to: {transcribe_result.get('transcript_path')}")
+            else:
+                print(f"\n✗ Transcription failed: {transcribe_result.get('error')}")
+
         sys.exit(0)
     else:
         print(f"\n✗ Failed: {result.get('error', 'Unknown error')}", file=sys.stderr)
