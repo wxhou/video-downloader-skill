@@ -5,6 +5,7 @@ Supports: Douyin, X/Twitter, Bilibili, YouTube, Xiaohongshu
 """
 
 import argparse
+import asyncio
 import json
 import os
 import re
@@ -12,6 +13,12 @@ import subprocess
 import sys
 import urllib.request
 from pathlib import Path
+
+try:
+    from playwright.async_api import async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
 
 
 def detect_platform(url: str) -> str:
@@ -43,51 +50,97 @@ def parse_douyin_share(url: str) -> str:
     return url
 
 
-def download_douyin(url: str, output_dir: str = '.') -> dict:
-    """Download douyin video using third-party API"""
-    # Try multiple APIs
-    apis = [
-        f"https://api.leping.fun/dy/?url={url}",
-        f"https://min.taoanlife.com/dy?url={url}",
-    ]
-
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://www.douyin.com/'
-    }
-
+async def download_douyin_async(url: str, output_dir: str = '.') -> dict:
+    """Download douyin video using Playwright (browser automation)"""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    for api_url in apis:
-        try:
-            print(f"Trying API: {api_url[:50]}...")
-            req = urllib.request.Request(api_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=30) as response:
-                data = json.loads(response.read().decode('utf-8'))
+    if not PLAYWRIGHT_AVAILABLE:
+        return {'success': False, 'error': 'Playwright not installed. Run: pip install playwright && playwright install chromium'}
 
-                if data.get('code') == 0 or data.get('status') == 'success':
-                    video_url = data.get('data', {}).get('play_addr') or \
-                               data.get('data', {}).get('video') or \
-                               data.get('url')
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
 
-                    if video_url:
-                        # Download video
-                        video_path = output_path / f"douyin_video.mp4"
-                        urllib.request.urlretrieve(video_url, video_path)
+            print(f"Opening: {url}")
+            await page.goto(url, wait_until='networkidle')
 
+            # Wait for video element to be present
+            await page.wait_for_selector('video', timeout=10000)
+
+            # Extract video URL using JavaScript
+            video_info = await page.evaluate('''() => {
+                const video = document.querySelector('video');
+                if (!video) return { error: 'No video element found' };
+                return {
+                    url: video.currentSrc || video.src,
+                    duration: video.duration,
+                    width: video.videoWidth,
+                    height: video.videoHeight
+                };
+            }''')
+
+            if video_info.get('error'):
+                await browser.close()
+                return {'success': False, 'error': video_info['error']}
+
+            video_url = video_info.get('url')
+            if not video_url:
+                await browser.close()
+                return {'success': False, 'error': 'No video URL found'}
+
+            print(f"Found video URL: {video_url[:80]}...")
+
+            # Download the video
+            async with page.context.request.fetch(video_url) as response:
+                if response.status == 200:
+                    content = await response.body()
+
+                    # Try to get title/author from page
+                    title_info = await page.evaluate('''() => {
+                        const titleEl = document.querySelector('[class*="title"]') ||
+                                       document.querySelector('h1') ||
+                                       document.querySelector('[data-e2e="video-detail"]');
+                        const authorEl = document.querySelector('[class*="author"]') ||
+                                        document.querySelector('[data-e2e="video-author"]') ||
+                                        document.querySelector('a[href*="/user/"]');
                         return {
-                            'success': True,
-                            'platform': 'douyin',
-                            'video_path': str(video_path),
-                            'title': data.get('data', {}).get('title', 'douyin_video'),
-                            'author': data.get('data', {}).get('author', 'unknown')
-                        }
-        except Exception as e:
-            print(f"API failed: {e}")
-            continue
+                            title: titleEl ? titleEl.textContent?.trim() : 'douyin_video',
+                            author: authorEl ? authorEl.textContent?.trim() : 'unknown'
+                        };
+                    }''')
 
-    return {'success': False, 'error': 'All APIs failed'}
+                    # Sanitize filename
+                    title = title_info.get('title', 'douyin_video')[:50]
+                    author = title_info.get('author', 'unknown')[:20]
+                    safe_title = re.sub(r'[^\w\s-]', '', title).strip()
+                    safe_author = re.sub(r'[^\w\s-]', '', author).strip()
+
+                    video_path = output_path / f"{safe_title}_{safe_author}.mp4"
+                    with open(video_path, 'wb') as f:
+                        f.write(content)
+
+                    print(f"Downloaded: {video_path}")
+                    await browser.close()
+                    return {
+                        'success': True,
+                        'platform': 'douyin',
+                        'video_path': str(video_path),
+                        'title': safe_title,
+                        'author': safe_author
+                    }
+
+            await browser.close()
+            return {'success': False, 'error': 'Failed to download video'}
+
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+def download_douyin(url: str, output_dir: str = '.') -> dict:
+    """Download douyin video - async wrapper"""
+    return asyncio.run(download_douyin_async(url, output_dir))
 
 
 def download_video(url: str, output_dir: str = '.', extract_metadata: bool = True) -> dict:

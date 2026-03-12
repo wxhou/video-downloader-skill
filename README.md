@@ -14,7 +14,8 @@
 
 ```bash
 # 安装依赖
-pip install yt-dlp
+pip install yt-dlp playwright
+playwright install chromium
 
 # macOS 安装 ffmpeg
 brew install ffmpeg

@@ -22,7 +22,8 @@ Download videos from major social platforms in MP4 format with metadata extracti
 Install required dependencies:
 
 ```bash
-pip install videodl yt-dlp
+pip install yt-dlp playwright
+playwright install chromium
 ```
 
 Or use the included setup script:
@@ -112,37 +113,20 @@ Common errors and solutions:
 
 - **YouTube**: Best quality, may need proxy
 - **Bilibili**: Works well, supports series
-- **Douyin (抖音)**: ⚠️ Requires cookies. See "抖音下载配置" below
-- **Xiaohongshu (小红书)**: ⚠️ May require cookies
+- **Douyin (抖音)**: Uses Playwright browser automation - no cookies needed!
+- **Xiaohongshu (小红书)**: May require cookies
 - **X/Twitter**: Some videos require authentication
 
-## 抖音下载配置 (Important!)
+## 抖音下载 (无需Cookies)
 
-抖音需要登录 cookies 才能下载。有两种方式：
-
-### 方式1: 使用浏览器扩展获取 Cookies
-
-1. 安装浏览器扩展 "Get cookies.txt LOCALLY"
-2. 登录抖音网页版 (douyin.com)
-3. 导出 cookies 为 .txt 文件
-4. 使用以下命令下载：
+现在使用 Playwright 浏览器自动化技术，无需 cookies 即可下载抖音视频：
 
 ```bash
-yt-dlp --cookies cookies.txt "https://v.douyin.com/xxxxx" -o ~/Downloads
+# 自动提取无水印视频
+python scripts/download.py "https://www.douyin.com/video/123456789"
 ```
 
-### 方式2: 使用第三方解析 API
-
-```bash
-# 使用在线解析服务
-curl "https://api.example.com/douyin?url=抖音链接" -o video.mp4
-```
-
-### 推荐的在线解析服务
-
-- https://snaptik.app (推荐)
-- https://vidownloader.com
-- 抖音搜索 "抖音解析" 可找到更多
+如果 Playwright 方式失败，可以尝试 yt-dlp + cookies 方式：
 
 ## Implementation
 

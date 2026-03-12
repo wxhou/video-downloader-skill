@@ -13,6 +13,11 @@ fi
 echo "Installing yt-dlp..."
 pip install yt-dlp
 
+# Install Playwright (for Douyin download)
+echo "Installing Playwright..."
+pip install playwright
+playwright install chromium
+
 # Install ffmpeg (required for merging video/audio)
 if command -v brew &> /dev/null; then
     echo "Installing ffmpeg via Homebrew..."
