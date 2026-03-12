@@ -81,8 +81,8 @@ def main():
     parser.add_argument('video', help='Video file path')
     parser.add_argument('-o', '--output', help='Output file path (default: video.txt)')
     parser.add_argument('-m', '--model', default='medium',
-                        choices=['tiny', 'base', 'small', 'medium', 'large'],
-                        help='Whisper model size (default: base)')
+                        choices=['medium', 'large'],
+                        help='Whisper model size (default: medium)')
     parser.add_argument('-l', '--language', default='zh',
                         help='Language code (default: zh for Chinese)')
     parser.add_argument('--no-audio-extract', action='store_true',

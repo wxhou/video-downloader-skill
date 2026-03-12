@@ -94,10 +94,10 @@ By default, saves metadata as JSON:
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/download.py` | Single video download |
+| `scripts/download.py` | Single video download with optional transcription |
+| `scripts/transcribe.py` | Standalone video transcription |
 | `scripts/batch_download.py` | Batch download from URL list |
 | `scripts/setup.sh` | Install dependencies |
-| `scripts/platform_detect.py` | Detect platform from URL |
 
 ## Error Handling
 
@@ -128,7 +128,7 @@ python scripts/download.py "https://www.douyin.com/video/123456789"
 
 ## 视频转录 (语音转文字)
 
-使用 OpenAI Whisper 进行语音转文字。
+使用 OpenAI Whisper 进行语音转文字，默认输出**简体中文**。
 
 ### 安装转录依赖
 
@@ -138,7 +138,7 @@ pip install openai-whisper
 
 ### ⚠️ 重要：模型要求
 
-**必须使用 medium 或 larger 模型**，tiny/base/small 模型识别效果差。
+**必须使用 medium 或 large 模型**，tiny/base/small 模型识别效果差。
 
 ```bash
 # 下载 medium 模型 (约 1.4GB)
