@@ -58,13 +58,20 @@ def extract_audio(video_path: str, output_path: str = None) -> str:
     return str(audio_path)
 
 
-def transcribe(audio_path: str, model: str = 'base', language: str = 'zh') -> dict:
+def transcribe(audio_path: str, model: str = 'medium', language: str = 'zh') -> dict:
     """Transcribe audio using Whisper"""
     print(f"Loading Whisper {model} model...")
     whisper_model = whisper.load_model(model)
 
+    # Use initial_prompt to encourage simplified Chinese output
+    initial_prompt = "请使用简体中文（非繁体中文）输出以下内容。"
+
     print("Transcribing...")
-    result = whisper_model.transcribe(audio_path, language=language)
+    result = whisper_model.transcribe(
+        audio_path,
+        language=language,
+        initial_prompt=initial_prompt
+    )
 
     return result
 
