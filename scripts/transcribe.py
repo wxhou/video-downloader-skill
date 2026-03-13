@@ -2,6 +2,7 @@
 """
 Video Transcription Tool
 Extract audio and transcribe video content to text using Whisper
+Supports optional translation to English
 """
 
 import argparse
@@ -85,6 +86,8 @@ def main():
                         help='Whisper model size (default: medium)')
     parser.add_argument('-l', '--language', default='zh',
                         help='Language code (default: zh for Chinese)')
+    parser.add_argument('-t', '--translate', dest='translate_to',
+                        help='Translate transcript to specified language (e.g., en, ja, fr)')
     parser.add_argument('--no-audio-extract', action='store_true',
                         help='Skip audio extraction (use existing audio file)')
 
@@ -101,15 +104,31 @@ def main():
     # Transcribe
     result = transcribe(audio_path, args.model, args.language)
 
+    text = result['text']
+
+    # Translate if requested
+    if args.translate_to:
+        print(f"\nTranslating to {args.translate_to}...")
+        try:
+            from googletrans import Translator
+            translator = Translator()
+            translated = translator.translate(text, dest=args.translate_to)
+            text = translated.text
+            print(f"Translation complete!")
+        except ImportError:
+            print("Error: googletrans not installed. Install with: pip install googletrans-python")
+        except Exception as e:
+            print(f"Translation error: {e}")
+
     # Save transcript
     output_path = args.output or video_path.with_suffix('.txt')
 
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(result['text'])
+        f.write(text)
 
     print(f"\n✓ Transcript saved to: {output_path}")
     print(f"\n--- Transcript ---")
-    print(result['text'])
+    print(text)
 
 
 if __name__ == '__main__':

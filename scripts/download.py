@@ -201,7 +201,7 @@ def transcribe_audio(audio_path: str, model: str = 'base') -> dict:
         return {'success': False, 'error': str(e)}
 
 
-def transcribe_video(video_path: str, output_dir: str = '.', model: str = 'base') -> dict:
+def transcribe_video(video_path: str, output_dir: str = '.', model: str = 'medium', translate_to: str = None) -> dict:
     """Extract audio and transcribe video"""
     video_path = Path(video_path)
 
@@ -219,11 +219,27 @@ def transcribe_video(video_path: str, output_dir: str = '.', model: str = 'base'
     # Transcribe
     result = transcribe_audio(audio_path, model)
 
+    text = result.get('text', '')
+
+    # Translate if requested
+    if translate_to and result.get('success'):
+        print(f"\nTranslating to {translate_to}...")
+        try:
+            from googletrans import Translator
+            translator = Translator()
+            translated = translator.translate(text, dest=translate_to)
+            text = translated.text
+            print(f"Translation complete!")
+        except ImportError:
+            print("Warning: googletrans not installed. Install with: pip install googletrans-python")
+        except Exception as e:
+            print(f"Translation error: {e}")
+
     # Save transcript
     if result.get('success'):
         transcript_path = Path(output_dir) / f"{video_path.stem}.txt"
         with open(transcript_path, 'w', encoding='utf-8') as f:
-            f.write(result['text'])
+            f.write(text)
         result['transcript_path'] = str(transcript_path)
         print(f"Transcript saved to: {transcript_path}")
 
@@ -283,8 +299,10 @@ def main():
     parser.add_argument('-o', '--output', default='.', help='Output directory')
     parser.add_argument('--no-metadata', action='store_true', help='Skip metadata')
     parser.add_argument('--transcribe', action='store_true', help='Transcribe video to text')
+    parser.add_argument('--translate', dest='translate_to',
+                        help='Translate transcript to language (e.g., en, ja, fr)')
     parser.add_argument('--model', default='medium', choices=['medium', 'large'],
-                        help='Whisper model size (default: base)')
+                        help='Whisper model size (default: medium)')
 
     args = parser.parse_args()
 
@@ -305,7 +323,8 @@ def main():
             transcribe_result = transcribe_video(
                 result['video_path'],
                 args.output,
-                args.model
+                args.model,
+                args.translate_to
             )
             if transcribe_result.get('success'):
                 print(f"\n✓ Transcript: {transcribe_result['text'][:200]}...")
