@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Simplified Douyin Downloader - No browser window
-Uses Playwright headless mode
+Douyin Downloader - Stealth headless mode
 """
 
 import asyncio
@@ -12,40 +11,60 @@ from pathlib import Path
 
 try:
     from playwright.async_api import async_playwright
+    from playwright_stealth import Stealth
 except ImportError:
-    print("Error: playwright not installed")
-    print("Run: pip install playwright && playwright install chromium")
+    print("Error: Required packages not installed")
+    print("Run: pip install playwright playwright-stealth && playwright install chromium")
     sys.exit(1)
 
 
 async def download_douyin(url: str, output: str = ".") -> str:
-    """Download douyin video using headless browser"""
+    """Download douyin video using stealth headless browser"""
 
     async with async_playwright() as p:
-        # Headless mode - no visible window
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+            ]
+        )
 
-        # Set longer timeout
+        context = await browser.new_context(
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        )
+
+        page = await context.new_page()
+
+        # Apply stealth patches
+        stealth = Stealth()
+        await stealth.apply_stealth_async(page)
+
         print(f"Fetching: {url}")
+
         try:
-            await page.goto(url, wait_until='domcontentloaded', timeout=60000)
+            await page.goto(url, wait_until='networkidle', timeout=90000)
         except:
-            await page.goto(url, timeout=60000)
+            await page.goto(url, timeout=90000)
 
-        # Wait for video with retry
-        for _ in range(3):
-            try:
-                await page.wait_for_selector('video', timeout=10000)
+        # Wait for video to load
+        await page.wait_for_timeout(3000)
+
+        # Try to get video URL
+        video_url = None
+        for attempt in range(3):
+            video_url = await page.evaluate('''() => {
+                const video = document.querySelector('video');
+                if (video) {
+                    return video.currentSrc || video.src || null;
+                }
+                return null;
+            }''')
+
+            if video_url:
                 break
-            except:
-                await page.wait_for_timeout(2000)
-
-        # Get video URL
-        video_url = await page.evaluate('''() => {
-            const video = document.querySelector('video');
-            return video?.currentSrc || video?.src;
-        }''')
+            print(f"Attempt {attempt + 1}: waiting...")
+            await page.wait_for_timeout(2000)
 
         if not video_url:
             await browser.close()
@@ -53,7 +72,9 @@ async def download_douyin(url: str, output: str = ".") -> str:
 
         # Get title
         title = await page.evaluate('''() => {
-            const el = document.querySelector('[class*="title"]') || document.querySelector('h1');
+            const el = document.querySelector('[class*="title"]') ||
+                       document.querySelector('h1') ||
+                       document.title;
             return el?.textContent?.trim()?.slice(0, 50) || 'video';
         }''')
 
@@ -63,9 +84,8 @@ async def download_douyin(url: str, output: str = ".") -> str:
         safe_title = "".join(c for c in title if c.isalnum() or c in ' -_').strip()
         output_path = Path(output) / f"{safe_title}.mp4"
 
-        print(f"Downloading to: {output_path}")
+        print(f"Downloading: {safe_title}.mp4")
 
-        # Use curl for download
         cmd = ['curl', '-L', '-H', 'Referer: https://www.douyin.com/',
                '-o', str(output_path), video_url]
         subprocess.run(cmd, check=True)

@@ -22,7 +22,7 @@ Download videos from major social platforms in MP4 format with metadata extracti
 Install required dependencies:
 
 ```bash
-pip install yt-dlp playwright
+pip install yt-dlp playwright playwright-stealth
 playwright install chromium
 ```
 
